@@ -3,7 +3,7 @@
 #
 # Author: bgkf
 #
-# Allow standard end users to to delete and reinstall .apps in /Applications.
+# Allow standard end users to to delete and reinstall apps in /Applications.
 #
 
 # variables
