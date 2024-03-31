@@ -1,5 +1,11 @@
 #!/bin/bash
 
+#
+# Author: bgkf
+#
+# Display the preferred networks and remove the selected SSIDs form the list.
+# 
+
 # Variables
 loggedInUser=$(stat -f%Su /dev/console)
 
