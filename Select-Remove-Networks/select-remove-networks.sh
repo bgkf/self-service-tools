@@ -3,7 +3,7 @@
 #
 # Author: bgkf
 #
-# Display the preferred networks and remove the selected SSIDs form the list.
+# Display the preferred networks and remove the selected SSIDs from the list.
 # 
 
 # Variables
