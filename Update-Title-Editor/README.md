@@ -2,7 +2,8 @@
 
 Title editor is Jamf's tool for maintaing custom software titles in patch management.<br>
 This is my method for automating the steps to update Title Editor and patch management.<br> 
-Using the process here, computers are added to smart groups that trigger notifications and self service updates for these software titles.<br>
+Computers are added to smart groups that trigger notifications and self service updates for these software titles.<br> 
+The smart group process is detailed by ScriptingOSX [here](https://scriptingosx.com/2020/06/using-installomator-with-jamf-pro/).<br>
 <br>
 PROCESS<br>
 1. Triggered manually through self service.<br>
