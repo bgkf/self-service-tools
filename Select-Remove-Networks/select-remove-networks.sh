@@ -1,88 +1,73 @@
 #!/bin/bash
 
-#
-# Author: bgkf
-#
-# Display the preferred networks and remove the selected SSIDs from the list.
-# 
+# Self service tool to allow a standard user to remove SSIDs from the list of preferred networks (AKA known networks).
+# Launches a pop up with a multi-select check-box, then removes the selected items.
+# Will remove the active SSID. If removed and Wi-Fi is turned off the SSID will need to be re-authenticated. 
+# Could be improved by adding confirmation.
 
 # Variables
 loggedInUser=$(stat -f%Su /dev/console)
+uid=$(id -u "$loggedInUser")
+networkSetupCmd="/usr/sbin/networksetup"
+networkList="/tmp/wifi_networks.txt"
+IBMNotifierPath="/Library/Management/super/IBM Notifier.app/Contents/MacOS/IBM Notifier"
+logoPath="/Library/Management/super/icon-light.png"
+filePath="/tmp/networks.txt"
 
-# Function to retrieve preferred Wi-Fi networks
-getPreferredNetworks() {
-    networkSetupCmd="/usr/sbin/networksetup"
-    networkList="/tmp/wifi_networks.txt"
-    runAsUser() {
-        launchctl asuser "$loggedInUser" sudo -u "$loggedInUser" "$@"
-    }
+# get hardware port for Wi-Fi
+hardwarePort=$(launchctl asuser "$uid" "$networkSetupCmd" -listallhardwareports | grep -A 1 Wi-Fi | awk 'FNR==2{print $2}' )
+# echo $hardwarePort
 
-    # Retrieve the list of preferred Wi-Fi networks
-    runAsUser "$networkSetupCmd" -listpreferredwirelessnetworks Wi-Fi > "$networkList"
-
-    # Extract network names
-    networkNames=$(cat "$networkList" | sed -n '2,$p')
-
-    # Print the list of preferred Wi-Fi networks
-    echo "$networkNames"
-
-    # Clean up temporary file
-    rm "$networkList"
-}
+# Retrieve the list of preferred Wi-Fi networks
+networks=$(launchctl asuser "$uid" "$networkSetupCmd" -listpreferredwirelessnetworks "$hardwarePort" | sed -n '2,$p' | sed 's/\t//g' | tee $filePath)
+echo "networks:::$networks"
+preferredNetworks=$(echo "$networks" | sed 's/$/\\n/g' | tr -d '\n')
+echo "preferred networks:::$preferredNetworks"
 
 # Function to remove a preferred network
-removePreferredNetwork() {
-    networkSetupCmd="/usr/sbin/networksetup"
-    runAsUser() {
-        launchctl asuser "$loggedInUser" sudo -u "$loggedInUser" "$@"
-    }
+removePreferredNetworks() {
+	# this can be a multi select situation
+    echo "item(s) selected from list: $Selection"
+	# make the selected items an array
+	selected=($Selection)
+    echo "selected item(s) array: ${selected[@]}"
 
-    # Prompt the user to select a network from the list
-    selectedNetwork=$(/Library/Management/super/IBM\ Notifier.app/Contents/MacOS/IBM\ Notifier \
-        -type popup \
-        -title "Remove Preferred Network" \
-        -subtitle "Select a network to remove from the preferred list." \
-        -bar_title "Remove Preferred Network" \
-        -accessory_view_type dropdown \
-        -accessory_view_payload "$(getPreferredNetworks)" \
-        -main_button_label "Remove" \
-        -secondary_button_label "Cancel" \
-        -icon_path "/path/to/your/icon.png" \
-        -always_on_top)
-
-    # Extract the selected network from the response
-    selectedNetwork=$(echo "$selectedNetwork" | awk -F ': ' '{print $2}')
-
-    if [[ -n "$selectedNetwork" ]]; then
-        # Remove the selected network from the preferred list
-        runAsUser "$networkSetupCmd" -removepreferredwirelessnetwork Wi-Fi "$selectedNetwork"
-
-        # Display a confirmation message
-        osascript -e "display dialog \"The network '$selectedNetwork' has been removed from the preferred list.\" buttons {\"OK\"} default button 1 with icon note with title \"Network Removed\""
-    fi
+    # remove items from the list of preferrred networks
+	for select in "${selected[@]}"; do
+    	echo "item index to remove: $select"
+        line=$(($select+1))
+        echo "line number is $line"
+        ssid=$(awk -v lineNumber="$line" 'FNR==lineNumber{print}' $filePath)
+        echo "ssid to remove: $ssid"
+        # remove the ssid from the preferred netowrks
+        launchctl asuser "$uid" "$networkSetupCmd" -removepreferredwirelessnetwork "$hardwarePort" "$ssid"
+	done
 }
 
-# Display a pop-up message to the user with the current Wi-Fi network and the list of preferred Wi-Fi networks
-currentNetwork=$(/usr/sbin/networksetup -getairportnetwork en0 | awk -F ": " '{print $2}')
-preferredNetworks=$(getPreferredNetworks)
-
 # Display the pop-up message with IBM Notifier
-/Library/Management/super/IBM\ Notifier.app/Contents/MacOS/IBM\ Notifier \
+Selection=$("$IBMNotifierPath" \
     -type popup \
     -title "Wi-Fi Network Information" \
-    -subtitle "Current Network: $currentNetwork" \
-    -bar_title "Wi-Fi Network Information" \
-    -accessory_view_type label \
-    -accessory_view_payload "Preferred Wi-Fi Networks:\n$preferredNetworks" \
-    -main_button_label "OK" \
-    -secondary_button_label "Remove Network" \
-    -icon_path "/path/to/your/icon.png" \
+    -bar_title "Select a network(s) to remove." \
+    -accessory_view_type checklist \
+    -accessory_view_payload "/list $preferredNetworks" \
+    -main_button_label "Remove Selected Network(s)" \
+    -secondary_button_label "Cancel" \
+    -icon_path "$logoPath" \
+    -icon_width 35 \
+    -icon_height 35 \
     -always_on_top
+)
 
 # If the "Remove Network" button is clicked, remove the selected network
 buttonClicked=$?
+echo "button $buttonClicked was clicked."
+
 if [ $buttonClicked -eq 2 ]; then
-    removePreferredNetwork
+	echo "Cancel was clicked."
+    exit 0
+else
+	removePreferredNetworks
 fi
 
 exit 0
