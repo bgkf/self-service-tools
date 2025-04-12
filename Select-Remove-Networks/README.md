@@ -1,10 +1,17 @@
 # Select-Remove-Networks
 #### Self service tool that allows standard users to remove SSIDs from their preferred network list. 
+The pop-up to select networks to remove.
 <br>
-<img width="500" alt="net1" src="https://github.com/bgkf/self-service-tools/assets/108151241/4c57f632-8123-44bf-92dc-d7fb030af0a3">
+<img width="400" alt="Screenshot 2025-04-12 at 12 05 44 PM" src="https://github.com/user-attachments/assets/3fb75738-69cd-4f02-b8a6-2ac938140f5c" />
 <br>
-<img width="500" alt="net2" src="https://github.com/bgkf/self-service-tools/assets/108151241/678237fc-4562-4c6a-8c33-16896938accc">
+
+#### System Settings > Wi-Fi > Advanced > Known Networks
+Before
 <br>
-<img width="500" alt="net3" src="https://github.com/bgkf/self-service-tools/assets/108151241/d192b63f-2277-4eae-a81d-0a7820c1937e">
+<img width="400" alt="Screenshot 2025-04-12 at 12 05 12 PM" src="https://github.com/user-attachments/assets/2dd3b1f0-642f-44b8-b2fc-95825d742ee8" />
 <br>
-<img width="500" alt="net4" src="https://github.com/bgkf/self-service-tools/assets/108151241/93969373-88d7-4951-8fe7-0b2eb665bb08">
+After
+<br>
+<img width="400" alt="Screenshot 2025-04-12 at 12 04 42 PM" src="https://github.com/user-attachments/assets/7b549be1-781b-40c0-8555-134af89441f5" />
+
+
