@@ -59,7 +59,7 @@ patchManagement() {
 }
 
 # array of titles
-titles=(chatGPT cloudBrink cursor DockUtil oktaVerify raycast tsh Warp)
+titles=(chatGPT cloudBrink compass cursor DockUtil oktaVerify raycast tsh Warp)
 
 for title in $titles; do
 	case $title in
@@ -72,6 +72,11 @@ for title in $titles; do
 			name="BrinkAgent"
 			titleID="6"
 			releaseVersion=$(curl -sL "https://cloudbrink.com/brink-app-dl/release-notes.txt" | grep -i macos | awk '{print $3}')
+		;;
+           	compass)
+			name="MongoDB Compass"
+	    		titleID="14"
+    	    		releaseVersion=$(curl -fs "https://github.com/mongodb-js/compass/releases" | grep "/mongodb-js/compass/releases/tag" | awk 'NR==1{print $NF}' | sed 's/<.*//' | cut -d">" -f2 | grep -v beta )
 		;;
 		cursor)
 			name="Cursor"
