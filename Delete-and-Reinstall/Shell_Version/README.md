@@ -1,7 +1,7 @@
-# Delete-and-Reinstall
+### Delete-and-Reinstall - Shell Script Version
 A self service tool for non-admin end users to delete and reinstall a limited selection of applications on macOS. 
 
-### This script is dependent on:
+**This script is dependent on:**
 - [IBM Notifier](https://github.com/IBM/mac-ibm-notifications) for the popups ([Swift Dialog](https://github.com/swiftDialog/swiftDialog) also works).
 - [DockUtil](https://github.com/kcrawford/dockutil) to manage the dock. 
 - [Installomator](https://github.com/Installomator/Installomator) to re-install the app and notify the end user about the progess.
@@ -9,7 +9,7 @@ A self service tool for non-admin end users to delete and reinstall a limited se
 
 Big thanks to all.<br><br>
 
-### To use the Delete and Reinstall script in your environment:
+**To use the Delete and Reinstall script in your environment:**
 1. Change the path to the IBM Notifier.
 2. Change the path to the icon.
 3. Change the language in each popup.
@@ -20,7 +20,7 @@ Big thanks to all.<br><br>
    - appNameDock - command to find the name of an app in the dock.
 <br>
 
-### Screen Shots and description of the tool in action.<br>
+**Screen Shots and description of the tool in action.**<br>
 1. The tool is launched from self service.<br><br>
 <img width="150"  alt="DandR0" src="https://github.com/bgkf/self-service-tools/assets/108151241/bc0e621a-26a2-49d5-8948-c61f118d859f"><br>
 3. Popup with app selector.<br>
