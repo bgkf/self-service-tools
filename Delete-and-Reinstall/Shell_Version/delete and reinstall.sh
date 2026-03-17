@@ -25,14 +25,14 @@ runAsUser() {
   fi
 }
 
-# selection popup. the dropdown selection ordinal is captured in the appSelection variable.
+# selection popup. set into a variable to capture the dropdown selection ordinal.
 appSelection=$($IBM_Path \
 -type popup \
 -title "Delete and reinstall an application." \
 -subtitle "Select the app from the dropdown menu, click \"Delete and Reinstall\" and then confirm in the following popup." \
 -bar_title "Delete and reinstall an Application" \
 -accessory_view_type dropdown \
--accessory_view_payload "/list Select Application\n1Password 8\n1Password 7\nAsana\nCloudBrink\nFigma\nLoom\nSlack\nZoom /selected 0" \
+-accessory_view_payload "/list Select Application\n1Password\nAsana\nBrinkAgent(CloudBrink)\nChrome\nFigma\nLinear\nLoom\nSlack\nZoom /selected 0" \
 -main_button_label "Delete and Reinstall" \
 -secondary_button_label "Quit" \
 -icon_path $icon_path \
@@ -41,7 +41,7 @@ appSelection=$($IBM_Path \
 # Put the result of the button click into a variable. Ok = 0. Quit = 2.
 button=$?
 
-# the case is selected from the appSelection variable.
+# case
 case $appSelection in
 	1)
 		appName="1Password.app"
@@ -49,36 +49,41 @@ case $appSelection in
 		appNameDock="1Password"			
 	;;
 	2)
-		appName="1Password 7.app"
-		jamfPID=641
-		appNameDock="1Password 7"
-	;;
-	3)
 		appName="Asana.app"
 		jamfPID=642
 		appNameDock="Asana"
 	;;
-	4)
+	3)
 		appName="BrinkAgent.app"
 		jamfPID=1022
 		appNameDock="BrinkAgent"
 	;;
-	5)
+	4)
+		appName="Google Chrome.app"
+		jamfPID=1172
+		appNameDock="Chrome"
+	;;
+    5)
 		appName="Figma.app"
 		jamfPID=643
 		appNameDock="Figma"
 	;;
 	6)
+		appName="Linear.app"
+		jamfPID=1491
+		appNameDock="Linear"
+	;;
+	7)
 		appName="Loom.app"
 		jamfPID=644
 		appNameDock="Loom"
 	;;
-	7)
+	8)
 		appName="Slack.app"
 		jamfPID=645
 		appNameDock="Slack"
 	;;
-	8)
+	9)
 		appName="zoom.us.app"
 		jamfPID=647
 		appNameDock="zoom.us"
@@ -93,11 +98,12 @@ echo $appInDock
 echo $appPosition
 echo $appSection
 
-# in the future -> check if app is active.
+# check if app is active.
+
 
 # If the main button was clicked then continue to the confirmation popup.
 if [[ $button = 0 ]]; then
-	# Report to the Jamf policy log: which button was clicked.
+	# Report to log: which button was clicked.
 	printf '%b\n'
     echo "$loggedInUser Delete and Reinstall actions."
     echo "The OK button was clicked on the selection popup."			
@@ -108,7 +114,7 @@ if [[ $button = 0 ]]; then
 		# Set case from selection.
 		$case = $appSelection
 			
-		# Report to the Jamf policy log: app name selected.
+		# Report to log: app name selected.
 		echo "$appName was selected."
         echo "The Jamf policy ID is $jamfPID"
 		echo "The app dock name is $appNameDock"
@@ -122,7 +128,7 @@ if [[ $button = 0 ]]; then
 			-icon_path $icon_path \
 			-always_on_top
 			
-            # Report to the Jamf policy log: The selected app is not installed.
+            # Report to log: The selected app is not installed.
             echo "$appName is not installed and can not be deleted." 
     		exit 0
 		
@@ -142,10 +148,10 @@ if [[ $button = 0 ]]; then
 			
 			# Delete and reinstall.
 			if [ $button = 0 ]; then
-				# Report to the Jamf policy log: which button was clicked.
+				# Report to log: which button was clicked.
 				echo "The OK button was clicked on the confirmation popup"
 
-                # Report to the Jamf policy log: app name and policy id.
+                # Report to log: app name and policy id.
     			echo "to delete $appName and reinstall with policy id $jamfPID."
 
 				# Check if the the app is in the dock.
@@ -170,10 +176,10 @@ if [[ $button = 0 ]]; then
                 	echo "$appName was NOT added to the dock."
 				fi 
                 
-                # in the future -> if app was active re-launch it.
+                # if app was active re-launch it.
                 
 			else
-				# Report to the Jamf policy log and exit.
+				# Report to log and exit.
 				echo "Quit was clicked on the confirmation popup."
 				exit 0
 			fi
@@ -186,12 +192,12 @@ if [[ $button = 0 ]]; then
 		-bar_title "Error." \
 		-icon_path $icon_path \
 		-always_on_top
-		# Report to the Jamf policy log and exit.
+		# Report to log and exit.
 		echo "No app selection was made."
 		exit 0			
 	fi
 else
-	# Report to the Jamf policy log and exit.
+	# Report to log and exit.
 	echo "Quit was clicked on the selection popup."
 	exit 0
 fi
