@@ -4,6 +4,7 @@
       "displayName": "1Password",
       "bundleName": "1Password.app",
       "bundleIdentifier": "com.1password.1password",
+      "bundleId": "com.1password.1password",
       "jamfPolicyID": "969",
       "dockLabel": "1Password"
     },
@@ -11,6 +12,7 @@
       "displayName": "Asana",
       "bundleName": "Asana.app",
       "bundleIdentifier": "com.asana.desktop",
+      "bundleId": "com.asana.desktop",
       "jamfPolicyID": "642",
       "dockLabel": "Asana"
     },
@@ -18,6 +20,7 @@
       "displayName": "BrinkAgent (CloudBrink)",
       "bundleName": "BrinkAgent.app",
       "bundleIdentifier": "com.cloudbrink.agent",
+      "bundleId": "com.cloudbrink.agent",
       "jamfPolicyID": "1022",
       "dockLabel": "BrinkAgent"
     },
@@ -25,6 +28,7 @@
       "displayName": "Google Chrome",
       "bundleName": "Google Chrome.app",
       "bundleIdentifier": "com.google.Chrome",
+      "bundleId": "com.google.Chrome",
       "jamfPolicyID": "1172",
       "dockLabel": "Google Chrome"
     },
@@ -32,6 +36,7 @@
       "displayName": "Figma",
       "bundleName": "Figma.app",
       "bundleIdentifier": "com.figma.Desktop",
+      "bundleId": "com.figma.Desktop",
       "jamfPolicyID": "643",
       "dockLabel": "Figma"
     },
@@ -39,6 +44,7 @@
       "displayName": "Linear",
       "bundleName": "Linear.app",
       "bundleIdentifier": "com.linear",
+      "bundleId": "com.linear",
       "jamfPolicyID": "1491",
       "dockLabel": "Linear"
     },
@@ -46,6 +52,7 @@
       "displayName": "Loom",
       "bundleName": "Loom.app",
       "bundleIdentifier": "com.loom.desktop",
+      "bundleId": "com.loom.desktop",
       "jamfPolicyID": "644",
       "dockLabel": "Loom"
     },
@@ -53,6 +60,7 @@
       "displayName": "Slack",
       "bundleName": "Slack.app",
       "bundleIdentifier": "com.tinyspeck.slackmacgap",
+      "bundleId": "com.tinyspeck.slackmacgap",
       "jamfPolicyID": "645",
       "dockLabel": "Slack"
     },
@@ -60,6 +68,7 @@
       "displayName": "Zoom",
       "bundleName": "zoom.us.app",
       "bundleIdentifier": "us.zoom.xos",
+      "bundleId": "us.zoom.xos",
       "jamfPolicyID": "647",
       "dockLabel": "zoom.us"
     }
