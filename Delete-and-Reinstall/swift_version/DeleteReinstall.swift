@@ -8,6 +8,7 @@ struct AppEntry: Codable {
     let displayName: String
     let bundleName: String
     let bundleIdentifier: String
+    let bundleId: String
     let jamfPolicyID: String
     let dockLabel: String
 }
@@ -61,6 +62,31 @@ func getBrandingIcon(username: String) -> NSImage? {
     let path = "/Users/\(username)/Library/Application Support/com.jamfsoftware.selfservice.mac/Documents/Images/brandingimage.png"
     if let img = NSImage(contentsOfFile: path) { return img }
     return NSImage(named: NSImage.applicationIconName)
+}
+
+// MARK: - App Icon Resolution
+
+/// Resolve an app icon from the bundle identifier, falling back to the app name, then a generic SF Symbol.
+func resolveAppIcon(bundleId: String, bundleName: String) -> NSImage {
+    // Try NSWorkspace.urlForApplication(withBundleIdentifier:) — macOS 12+
+    if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+        let icon = NSWorkspace.shared.icon(forFile: url.path)
+        icon.size = NSSize(width: 36, height: 36)
+        return icon
+    }
+    // Fallback: look in /Applications by bundle name
+    let appPath = "/Applications/\(bundleName)"
+    if FileManager.default.fileExists(atPath: appPath) {
+        let icon = NSWorkspace.shared.icon(forFile: appPath)
+        icon.size = NSSize(width: 36, height: 36)
+        return icon
+    }
+    // Final fallback: generic SF Symbol
+    if let symbol = NSImage(systemSymbolName: "app.dashed", accessibilityDescription: bundleName) {
+        let config = NSImage.SymbolConfiguration(pointSize: 28, weight: .regular)
+        return symbol.withSymbolConfiguration(config) ?? symbol
+    }
+    return NSImage()
 }
 
 // MARK: - Shell Commands
@@ -207,6 +233,78 @@ func triggerReinstall(policyID: String) -> Bool {
     }
 }
 
+// MARK: - Icon Grid Cell
+
+class AppIconButton: NSView {
+    let appEntry: AppEntry
+    let iconView: NSImageView
+    let nameLabel: NSTextField
+    var isSelected: Bool = false { didSet { needsDisplay = true } }
+    var onClick: ((AppEntry) -> Void)?
+
+    init(frame: NSRect, app: AppEntry) {
+        self.appEntry = app
+
+        // Icon centered in upper portion of cell
+        let iconSize: CGFloat = 36
+        let iconX = (frame.width - iconSize) / 2
+        iconView = NSImageView(frame: NSRect(x: iconX, y: frame.height - iconSize - 8, width: iconSize, height: iconSize))
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+
+        // Placeholder — will be replaced async
+        if let placeholder = NSImage(systemSymbolName: "app.dashed", accessibilityDescription: app.displayName) {
+            let config = NSImage.SymbolConfiguration(pointSize: 28, weight: .regular)
+                .applying(.init(paletteColors: [.secondaryLabelColor]))
+            iconView.image = placeholder.withSymbolConfiguration(config) ?? placeholder
+        }
+
+        // Name label below icon
+        nameLabel = NSTextField(labelWithString: app.displayName)
+        nameLabel.frame = NSRect(x: 2, y: 4, width: frame.width - 4, height: 28)
+        nameLabel.font = .systemFont(ofSize: 10)
+        nameLabel.alignment = .center
+        nameLabel.maximumNumberOfLines = 2
+        nameLabel.lineBreakMode = .byWordWrapping
+        nameLabel.textColor = .labelColor
+
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.cornerRadius = 8
+
+        addSubview(iconView)
+        addSubview(nameLabel)
+
+        // Load real icon async
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let resolved = resolveAppIcon(bundleId: app.bundleId, bundleName: app.bundleName)
+            DispatchQueue.main.async {
+                self?.iconView.image = resolved
+            }
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        if isSelected {
+            NSColor.controlAccentColor.withAlphaComponent(0.25).setFill()
+            NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8).fill()
+            NSColor.controlAccentColor.setStroke()
+            let border = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 8, yRadius: 8)
+            border.lineWidth = 1.5
+            border.stroke()
+        } else {
+            NSColor.quaternaryLabelColor.withAlphaComponent(0.15).setFill()
+            NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8).fill()
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        onClick?(appEntry)
+    }
+}
+
 // MARK: - Single Window UI
 
 enum DialogState {
@@ -217,7 +315,6 @@ enum DialogState {
     case error(String)
 }
 
-/// Badge type for the small status indicator overlaid on the branding icon.
 enum StatusBadge {
     case none
     case warning
@@ -226,20 +323,17 @@ enum StatusBadge {
     case working
 }
 
-/// Composites the branding icon with a small SF Symbol badge in the bottom-right corner.
 func badgedIcon(base: NSImage?, badge: StatusBadge) -> NSImage {
-    let size = NSSize(width: 64, height: 64)
+    let size = NSSize(width: 36, height: 36)
     let result = NSImage(size: size)
     result.lockFocus()
 
-    // Draw the branding icon at full size.
     if let base = base {
         base.draw(in: NSRect(origin: .zero, size: size))
     }
 
-    // Draw the badge in the bottom-right corner.
     if badge != .none {
-        let badgeSize: CGFloat = 24
+        let badgeSize: CGFloat = 16
         let badgeRect = NSRect(x: size.width - badgeSize, y: 0, width: badgeSize, height: badgeSize)
 
         let (symbolName, tint): (String, NSColor) = {
@@ -257,7 +351,7 @@ func badgedIcon(base: NSImage?, badge: StatusBadge) -> NSImage {
                 .applying(.init(paletteColors: [tint]))
             let configured = symbol.withSymbolConfiguration(config) ?? symbol
             configured.isTemplate = false
-            configured.draw(in: badgeRect.insetBy(dx: 2, dy: 2))
+            configured.draw(in: badgeRect.insetBy(dx: 1, dy: 1))
         }
     }
 
@@ -265,26 +359,50 @@ func badgedIcon(base: NSImage?, badge: StatusBadge) -> NSImage {
     return result
 }
 
-/// The persistent window controller that manages a single window throughout the tool's lifecycle.
+// MARK: - Tool Window
+
 class ToolWindow {
     let window: NSWindow
-    let iconView: NSImageView
+    let brandingIconView: NSImageView
     let titleLabel: NSTextField
     let messageLabel: NSTextField
-    let popup: NSPopUpButton
+    let gridContainer: NSView
     let primaryButton: NSButton
     let secondaryButton: NSButton
     let spinner: NSProgressIndicator
     let brandingIcon: NSImage?
 
-    private var buttonClicked: Int = -1
+    // Status icon for confirmation/error/success/working states (centered, replaces grid)
+    let statusIconView: NSImageView
+    // Large app icon shown in status states
+    let appIconView: NSImageView
+
+    private var iconButtons: [AppIconButton] = []
+    private var selectedApp: AppEntry? = nil
+    private var selectedAppIcon: NSImage? = nil
+
+    // Layout constants
+    static let winW: CGFloat = 380
+    static let statusH: CGFloat = 280
+    static let headerH: CGFloat = 80    // topInset + icon/title/message
+    static let buttonAreaH: CGFloat = 80 // buttons + padding
+    static let cellH: CGFloat = 80
+    static let vSpacing: CGFloat = 8
+
+    /// Compute window height dynamically based on number of apps.
+    static func selectionHeight(appCount: Int) -> CGFloat {
+        let columns = 3
+        let rows = Int(ceil(Double(appCount) / Double(columns)))
+        let gridH = CGFloat(rows) * (cellH + vSpacing)
+        return headerH + gridH + buttonAreaH + 16
+    }
 
     init(icon: NSImage?) {
         self.brandingIcon = icon
 
-        // -- Window
-        let w: CGFloat = 360
-        let h: CGFloat = 240
+        let w = ToolWindow.winW
+        let h = ToolWindow.selectionHeight(appCount: 9) // default, resized on show()
+
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: w, height: h),
             styleMask: [.titled],
@@ -299,38 +417,54 @@ class ToolWindow {
         let content = window.contentView!
         content.wantsLayer = true
 
-        // -- Icon (top center)
-        iconView = NSImageView(frame: NSRect(x: (w - 64) / 2, y: h - 84, width: 64, height: 64))
-        iconView.imageScaling = .scaleProportionallyUpOrDown
-        iconView.image = icon
-        content.addSubview(iconView)
+        // -- Branding icon (top-left, below title bar)
+        let topInset: CGFloat = 32
+        brandingIconView = NSImageView(frame: NSRect(x: 16, y: h - topInset - 42, width: 36, height: 36))
+        brandingIconView.imageScaling = .scaleProportionallyUpOrDown
+        brandingIconView.image = icon
+        content.addSubview(brandingIconView)
 
-        // -- Title
+        // -- Title (next to branding icon)
         titleLabel = NSTextField(labelWithString: "")
-        titleLabel.frame = NSRect(x: 20, y: h - 116, width: w - 40, height: 22)
+        titleLabel.frame = NSRect(x: 58, y: h - topInset - 36, width: w - 74, height: 22)
         titleLabel.font = .boldSystemFont(ofSize: 15)
-        titleLabel.alignment = .center
+        titleLabel.alignment = .left
         content.addSubview(titleLabel)
 
-        // -- Message
+        // -- Message (below title)
         messageLabel = NSTextField(wrappingLabelWithString: "")
-        messageLabel.frame = NSRect(x: 20, y: h - 156, width: w - 40, height: 36)
-        messageLabel.font = .systemFont(ofSize: 13)
-        messageLabel.alignment = .center
-        messageLabel.maximumNumberOfLines = 2
+        messageLabel.frame = NSRect(x: 58, y: h - topInset - 56, width: w - 74, height: 18)
+        messageLabel.font = .systemFont(ofSize: 12)
+        messageLabel.textColor = .secondaryLabelColor
+        messageLabel.alignment = .left
+        messageLabel.maximumNumberOfLines = 1
         content.addSubview(messageLabel)
 
-        // -- Popup (only visible during selection)
-        popup = NSPopUpButton(frame: NSRect(x: 40, y: h - 186, width: w - 80, height: 28), pullsDown: false)
-        content.addSubview(popup)
+        // -- Grid container (for selection state)
+        let gridY: CGFloat = 60
+        let gridH: CGFloat = h - topInset - 74 - gridY
+        gridContainer = NSView(frame: NSRect(x: 16, y: gridY, width: w - 32, height: gridH))
+        content.addSubview(gridContainer)
 
-        // -- Spinner (only visible during working state)
-        spinner = NSProgressIndicator(frame: NSRect(x: (w - 32) / 2, y: h - 186, width: 32, height: 32))
+        // -- Status icon (centered, for non-selection states)
+        statusIconView = NSImageView(frame: NSRect(x: (w - 64) / 2, y: h - 140, width: 64, height: 64))
+        statusIconView.imageScaling = .scaleProportionallyUpOrDown
+        statusIconView.isHidden = true
+        content.addSubview(statusIconView)
+
+        // -- App icon (large, centered, shown in status states)
+        appIconView = NSImageView(frame: NSRect(x: (w - 64) / 2, y: h - 140, width: 64, height: 64))
+        appIconView.imageScaling = .scaleProportionallyUpOrDown
+        appIconView.isHidden = true
+        content.addSubview(appIconView)
+
+        // -- Spinner
+        spinner = NSProgressIndicator(frame: NSRect(x: (w - 32) / 2, y: 80, width: 32, height: 32))
         spinner.style = .spinning
         spinner.isHidden = true
         content.addSubview(spinner)
 
-        // -- Buttons (bottom row)
+        // -- Buttons
         let btnW: CGFloat = 130
         let btnH: CGFloat = 32
         let btnY: CGFloat = 16
@@ -362,35 +496,148 @@ class ToolWindow {
         NSApplication.shared.stopModal(withCode: .alertSecondButtonReturn)
     }
 
-    /// Update the window to reflect the given state, then run modal and return the button code.
+    private func buildGrid(apps: [AppEntry]) {
+        // Clear existing
+        gridContainer.subviews.forEach { $0.removeFromSuperview() }
+        iconButtons.removeAll()
+        selectedApp = nil
+
+        let columns = 3
+        let gridW = gridContainer.bounds.width
+        let cellW = floor(gridW / CGFloat(columns)) - 8
+        let cellH = ToolWindow.cellH
+        let hSpacing: CGFloat = 8
+        let vSpacing = ToolWindow.vSpacing
+
+        for (i, app) in apps.enumerated() {
+            let col = i % columns
+            let row = i / columns
+            let x = CGFloat(col) * (cellW + hSpacing)
+            // Top-aligned: row 0 at top of gridContainer
+            let y = gridContainer.bounds.height - CGFloat(row + 1) * (cellH + vSpacing)
+
+            let btn = AppIconButton(frame: NSRect(x: x, y: y, width: cellW, height: cellH), app: app)
+            btn.onClick = { [weak self] selected in
+                self?.selectApp(selected)
+            }
+            gridContainer.addSubview(btn)
+            iconButtons.append(btn)
+        }
+    }
+
+    private func selectApp(_ app: AppEntry) {
+        selectedApp = app
+        selectedAppIcon = resolveAppIcon(bundleId: app.bundleId, bundleName: app.bundleName)
+        for btn in iconButtons {
+            btn.isSelected = (btn.appEntry.displayName == app.displayName)
+        }
+        primaryButton.isEnabled = true
+    }
+
+    private func resizeWindow(height: CGFloat) {
+        var frame = window.frame
+        let delta = height - frame.height
+        frame.size.height = height
+        frame.origin.y -= delta
+        window.setFrame(frame, display: true, animate: true)
+        repositionViews(height: height)
+    }
+
+    private func repositionViews(height: CGFloat) {
+        let w = ToolWindow.winW
+        let topInset: CGFloat = 32
+
+        brandingIconView.frame = NSRect(x: 16, y: height - topInset - 42, width: 36, height: 36)
+        titleLabel.frame = NSRect(x: 58, y: height - topInset - 36, width: w - 74, height: 22)
+        messageLabel.frame = NSRect(x: 58, y: height - topInset - 56, width: w - 74, height: 18)
+
+        let gridY: CGFloat = 60
+        let gridH: CGFloat = height - topInset - 74 - gridY
+        gridContainer.frame = NSRect(x: 16, y: gridY, width: w - 32, height: gridH)
+
+        statusIconView.frame = NSRect(x: (w - 64) / 2, y: height - topInset - 150, width: 64, height: 64)
+        appIconView.frame = NSRect(x: (w - 64) / 2, y: height - topInset - 110, width: 64, height: 64)
+        spinner.frame = NSRect(x: (w - 32) / 2, y: height / 2 - 40, width: 32, height: 32)
+    }
+
+    /// Configure the layout for status states (confirmation, working, success, error).
+    /// Shows the selected app icon centered, with larger centered title and message below it.
+    private func configureStatusLayout(height: CGFloat, badge: StatusBadge, title: String, message: String, showAppIcon: Bool = true) {
+        let w = ToolWindow.winW
+        let topInset: CGFloat = 32
+
+        gridContainer.isHidden = true
+        statusIconView.isHidden = true
+
+        // App icon — large, centered
+        if showAppIcon, let appIcon = selectedAppIcon {
+            appIconView.image = appIcon
+            appIconView.isHidden = false
+            appIconView.frame = NSRect(x: (w - 64) / 2, y: height - topInset - 110, width: 64, height: 64)
+        } else {
+            appIconView.isHidden = true
+        }
+
+        // Branding icon — top left with badge
+        brandingIconView.isHidden = false
+        brandingIconView.image = badgedIcon(base: brandingIcon, badge: badge)
+
+        // Title — centered, larger
+        titleLabel.stringValue = title
+        titleLabel.font = .boldSystemFont(ofSize: 17)
+        titleLabel.alignment = .center
+        let titleY: CGFloat = showAppIcon ? height - topInset - 140 : height - topInset - 80
+        titleLabel.frame = NSRect(x: 20, y: titleY, width: w - 40, height: 24)
+
+        // Message — centered, larger
+        messageLabel.stringValue = message
+        messageLabel.font = .systemFont(ofSize: 13)
+        messageLabel.textColor = .secondaryLabelColor
+        messageLabel.alignment = .center
+        messageLabel.maximumNumberOfLines = 2
+        messageLabel.frame = NSRect(x: 20, y: titleY - 36, width: w - 40, height: 32)
+
+        // Spinner — below message
+        spinner.frame = NSRect(x: (w - 32) / 2, y: titleY - 76, width: 32, height: 32)
+    }
+
     func show(state: DialogState, apps: [AppEntry] = []) -> NSApplication.ModalResponse {
         primaryButton.target = ToolWindow.self
         secondaryButton.target = ToolWindow.self
 
         switch state {
         case .selection:
-            iconView.image = badgedIcon(base: brandingIcon, badge: .none)
-            titleLabel.stringValue = "Delete and Reinstall an Application"
-            messageLabel.stringValue = "Select the app, then click \"Delete & Reinstall\"."
-            popup.isHidden = false
-            popup.removeAllItems()
-            popup.addItem(withTitle: "Select Application...")
-            for app in apps {
-                popup.addItem(withTitle: app.displayName)
-            }
+            let selH = ToolWindow.selectionHeight(appCount: apps.count)
+            resizeWindow(height: selH)
+            brandingIconView.image = brandingIcon
+            brandingIconView.isHidden = false
+            titleLabel.stringValue = "Delete & Reinstall"
+            titleLabel.font = .boldSystemFont(ofSize: 15)
+            titleLabel.alignment = .left
+            titleLabel.frame = NSRect(x: 58, y: selH - 32 - 36, width: ToolWindow.winW - 74, height: 22)
+            messageLabel.stringValue = "Select an app below"
+            messageLabel.font = .systemFont(ofSize: 12)
+            messageLabel.textColor = .secondaryLabelColor
+            messageLabel.alignment = .left
+            messageLabel.maximumNumberOfLines = 1
+            messageLabel.frame = NSRect(x: 58, y: selH - 32 - 56, width: ToolWindow.winW - 74, height: 18)
+            gridContainer.isHidden = false
+            statusIconView.isHidden = true
+            appIconView.isHidden = true
             spinner.isHidden = true
             spinner.stopAnimation(nil)
+            buildGrid(apps: apps)
             primaryButton.title = "Delete & Reinstall"
             primaryButton.isHidden = false
-            primaryButton.isEnabled = true
+            primaryButton.isEnabled = false
             secondaryButton.title = "Cancel"
             secondaryButton.isHidden = false
 
         case .confirmation(let app):
-            iconView.image = badgedIcon(base: brandingIcon, badge: .warning)
-            titleLabel.stringValue = "Confirm Delete & Reinstall"
-            messageLabel.stringValue = "\(app.displayName) will be quit, deleted, and reinstalled. This may take a moment."
-            popup.isHidden = true
+            resizeWindow(height: ToolWindow.statusH)
+            configureStatusLayout(height: ToolWindow.statusH, badge: .warning,
+                title: "Confirm Delete & Reinstall",
+                message: "\(app.displayName) will be quit, deleted, and reinstalled.")
             spinner.isHidden = true
             spinner.stopAnimation(nil)
             primaryButton.title = "OK"
@@ -400,24 +647,23 @@ class ToolWindow {
             secondaryButton.isHidden = false
 
         case .working(let message):
-            iconView.image = badgedIcon(base: brandingIcon, badge: .working)
-            titleLabel.stringValue = "Working..."
-            messageLabel.stringValue = message
-            popup.isHidden = true
+            resizeWindow(height: ToolWindow.statusH)
+            configureStatusLayout(height: ToolWindow.statusH, badge: .working,
+                title: "Working...",
+                message: message)
             spinner.isHidden = false
             spinner.startAnimation(nil)
             primaryButton.isHidden = true
             secondaryButton.isHidden = true
-            // Don't run modal for working state — caller manages the run loop.
             window.orderFront(nil)
             window.display()
             return .continue
 
         case .success(let app):
-            iconView.image = badgedIcon(base: brandingIcon, badge: .success)
-            titleLabel.stringValue = "Complete"
-            messageLabel.stringValue = "\(app.displayName) has been reinstalled successfully."
-            popup.isHidden = true
+            resizeWindow(height: ToolWindow.statusH)
+            configureStatusLayout(height: ToolWindow.statusH, badge: .success,
+                title: "Complete",
+                message: "\(app.displayName) has been reinstalled successfully.")
             spinner.isHidden = true
             spinner.stopAnimation(nil)
             primaryButton.title = "OK"
@@ -426,10 +672,10 @@ class ToolWindow {
             secondaryButton.isHidden = true
 
         case .error(let message):
-            iconView.image = badgedIcon(base: brandingIcon, badge: .error)
-            titleLabel.stringValue = "Error"
-            messageLabel.stringValue = message
-            popup.isHidden = true
+            resizeWindow(height: ToolWindow.statusH)
+            configureStatusLayout(height: ToolWindow.statusH, badge: .error,
+                title: "Error",
+                message: message, showAppIcon: false)
             spinner.isHidden = true
             spinner.stopAnimation(nil)
             primaryButton.title = "OK"
@@ -443,14 +689,14 @@ class ToolWindow {
         return NSApplication.shared.runModal(for: window)
     }
 
-    /// Update the working message without blocking.
     func updateWorkingMessage(_ message: String) {
         messageLabel.stringValue = message
+        messageLabel.alignment = .center
         window.display()
     }
 
-    var selectedPopupIndex: Int {
-        return popup.indexOfSelectedItem
+    var selectedAppEntry: AppEntry? {
+        return selectedApp
     }
 }
 
@@ -477,20 +723,26 @@ log("Logged-in user: \(user.username) (uid \(user.uid))")
 let icon = getBrandingIcon(username: user.username)
 let toolWindow = ToolWindow(icon: icon)
 
-// Step 1: Selection
-let selResponse = toolWindow.show(state: .selection, apps: config.apps)
+// Filter to only installed apps
+let installedApps = config.apps.filter { FileManager.default.fileExists(atPath: "/Applications/\($0.bundleName)") }
+log("Found \(installedApps.count) of \(config.apps.count) apps installed")
+
+if installedApps.isEmpty {
+    let _ = toolWindow.show(state: .error("No managed apps are currently installed."))
+    exit(0)
+}
+
+// Step 1: Selection via icon grid
+let selResponse = toolWindow.show(state: .selection, apps: installedApps)
 guard selResponse == .alertFirstButtonReturn else {
     log("User cancelled selection dialog")
     exit(0)
 }
 
-let index = toolWindow.selectedPopupIndex
-guard index > 0 else {
+guard let selectedApp = toolWindow.selectedAppEntry else {
     let _ = toolWindow.show(state: .error("No application was selected."))
     exit(0)
 }
-
-let selectedApp = config.apps[index - 1]
 log("Selected: \(selectedApp.displayName) (\(selectedApp.bundleName), policy \(selectedApp.jamfPolicyID))")
 
 // Step 2: Check if installed
