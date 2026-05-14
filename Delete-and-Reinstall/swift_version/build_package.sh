@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-VERSION="1.0.1"
+VERSION="2.0.2"
 IDENTIFIER="com.wellthy.delete-reinstall"
 PKG_NAME="DeleteReinstall-${VERSION}.pkg"
 PAYLOAD_ROOT="$(mktemp -d)"
