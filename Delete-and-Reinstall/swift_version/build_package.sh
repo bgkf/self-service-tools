@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-VERSION="2.0.2"
+VERSION="2.1.1"
 IDENTIFIER="com.wellthy.delete-reinstall"
 PKG_NAME="DeleteReinstall-${VERSION}.pkg"
 PAYLOAD_ROOT="$(mktemp -d)"
@@ -53,6 +53,9 @@ chmod 755 "${PAYLOAD_ROOT}${INSTALL_DIR}/delete-reinstall"
 
 cp apps.json "${PAYLOAD_ROOT}${INSTALL_DIR}/apps.json"
 chmod 644 "${PAYLOAD_ROOT}${INSTALL_DIR}/apps.json"
+
+cp recycle.png "${PAYLOAD_ROOT}${INSTALL_DIR}/recycle.png"
+chmod 644 "${PAYLOAD_ROOT}${INSTALL_DIR}/recycle.png"
 
 # ── PREPARE SCRIPTS ─────────────────────────────────────────────────────────
 echo "==> Preparing installer scripts..."
