@@ -59,8 +59,14 @@ func getLoggedInUser() -> (username: String, uid: uid_t)? {
 }
 
 func getBrandingIcon(username: String) -> NSImage? {
-    let path = "/Users/\(username)/Library/Application Support/com.jamfsoftware.selfservice.mac/Documents/Images/brandingimage.png"
-    if let img = NSImage(contentsOfFile: path) { return img }
+    // 1. Bundled icon next to the binary
+    let binaryPath = CommandLine.arguments[0] as NSString
+    let bundledPath = binaryPath.deletingLastPathComponent + "/recycle.png"
+    if let img = NSImage(contentsOfFile: bundledPath) { return img }
+    // 2. Self Service branding image
+    let ssPath = "/Users/\(username)/Library/Application Support/com.jamfsoftware.selfservice.mac/Documents/Images/brandingimage.png"
+    if let img = NSImage(contentsOfFile: ssPath) { return img }
+    // 3. Generic fallback
     return NSImage(named: NSImage.applicationIconName)
 }
 
@@ -233,6 +239,41 @@ func triggerReinstall(policyID: String) -> Bool {
     }
 }
 
+/// Wait for the app to appear in /Applications/ after reinstall, with a timeout.
+func waitForInstall(bundleName: String, timeoutSeconds: Int = 120) -> Bool {
+    let appPath = "/Applications/\(bundleName)"
+    if FileManager.default.fileExists(atPath: appPath) {
+        log("\(bundleName) already present")
+        return true
+    }
+
+    log("Waiting for \(bundleName) to appear (timeout: \(timeoutSeconds)s)...")
+    let interval: TimeInterval = 2.0
+    let maxChecks = Int(Double(timeoutSeconds) / interval)
+
+    for i in 1...maxChecks {
+        Thread.sleep(forTimeInterval: interval)
+        if FileManager.default.fileExists(atPath: appPath) {
+            log("\(bundleName) appeared after ~\(Int(Double(i) * interval))s")
+            return true
+        }
+    }
+
+    logError("\(bundleName) did not appear within \(timeoutSeconds)s")
+    return false
+}
+
+func launchApp(bundleName: String, username: String, uid: uid_t) {
+    let appPath = "/Applications/\(bundleName)"
+    log("Launching \(bundleName) as \(username)")
+    let result = runShellCommand(["/usr/bin/open", appPath], asUser: (username, uid))
+    if result.status == 0 {
+        log("\(bundleName) launched successfully")
+    } else {
+        logError("Failed to launch \(bundleName): \(result.output)")
+    }
+}
+
 // MARK: - Icon Grid Cell
 
 class AppIconButton: NSView {
@@ -324,7 +365,7 @@ enum StatusBadge {
 }
 
 func badgedIcon(base: NSImage?, badge: StatusBadge) -> NSImage {
-    let size = NSSize(width: 36, height: 36)
+    let size = NSSize(width: 48, height: 48)
     let result = NSImage(size: size)
     result.lockFocus()
 
@@ -417,23 +458,25 @@ class ToolWindow {
         let content = window.contentView!
         content.wantsLayer = true
 
-        // -- Branding icon (top-left, below title bar)
+        // -- Branding icon (top-left, below title bar, vertically centered with text)
         let topInset: CGFloat = 32
-        brandingIconView = NSImageView(frame: NSRect(x: 16, y: h - topInset - 42, width: 36, height: 36))
+        let iconSize: CGFloat = 48
+        brandingIconView = NSImageView(frame: NSRect(x: 16, y: h - topInset - iconSize - 6, width: iconSize, height: iconSize))
         brandingIconView.imageScaling = .scaleProportionallyUpOrDown
         brandingIconView.image = icon
         content.addSubview(brandingIconView)
 
         // -- Title (next to branding icon)
+        let textX: CGFloat = 16 + iconSize + 12
         titleLabel = NSTextField(labelWithString: "")
-        titleLabel.frame = NSRect(x: 58, y: h - topInset - 36, width: w - 74, height: 22)
+        titleLabel.frame = NSRect(x: textX, y: h - topInset - 36, width: w - textX - 16, height: 22)
         titleLabel.font = .boldSystemFont(ofSize: 15)
         titleLabel.alignment = .left
         content.addSubview(titleLabel)
 
         // -- Message (below title)
         messageLabel = NSTextField(wrappingLabelWithString: "")
-        messageLabel.frame = NSRect(x: 58, y: h - topInset - 56, width: w - 74, height: 18)
+        messageLabel.frame = NSRect(x: textX, y: h - topInset - 56, width: w - textX - 16, height: 18)
         messageLabel.font = .systemFont(ofSize: 12)
         messageLabel.textColor = .secondaryLabelColor
         messageLabel.alignment = .left
@@ -546,10 +589,12 @@ class ToolWindow {
     private func repositionViews(height: CGFloat) {
         let w = ToolWindow.winW
         let topInset: CGFloat = 32
+        let iconSize: CGFloat = 48
+        let textX: CGFloat = 16 + iconSize + 12
 
-        brandingIconView.frame = NSRect(x: 16, y: height - topInset - 42, width: 36, height: 36)
-        titleLabel.frame = NSRect(x: 58, y: height - topInset - 36, width: w - 74, height: 22)
-        messageLabel.frame = NSRect(x: 58, y: height - topInset - 56, width: w - 74, height: 18)
+        brandingIconView.frame = NSRect(x: 16, y: height - topInset - iconSize - 6, width: iconSize, height: iconSize)
+        titleLabel.frame = NSRect(x: textX, y: height - topInset - 36, width: w - textX - 16, height: 22)
+        messageLabel.frame = NSRect(x: textX, y: height - topInset - 56, width: w - textX - 16, height: 18)
 
         let gridY: CGFloat = 60
         let gridH: CGFloat = height - topInset - 74 - gridY
@@ -611,16 +656,17 @@ class ToolWindow {
             resizeWindow(height: selH)
             brandingIconView.image = brandingIcon
             brandingIconView.isHidden = false
+            let textX: CGFloat = 76
             titleLabel.stringValue = "Delete & Reinstall"
             titleLabel.font = .boldSystemFont(ofSize: 15)
             titleLabel.alignment = .left
-            titleLabel.frame = NSRect(x: 58, y: selH - 32 - 36, width: ToolWindow.winW - 74, height: 22)
+            titleLabel.frame = NSRect(x: textX, y: selH - 32 - 36, width: ToolWindow.winW - textX - 16, height: 22)
             messageLabel.stringValue = "Select an app below"
             messageLabel.font = .systemFont(ofSize: 12)
             messageLabel.textColor = .secondaryLabelColor
             messageLabel.alignment = .left
             messageLabel.maximumNumberOfLines = 1
-            messageLabel.frame = NSRect(x: 58, y: selH - 32 - 56, width: ToolWindow.winW - 74, height: 18)
+            messageLabel.frame = NSRect(x: textX, y: selH - 32 - 56, width: ToolWindow.winW - textX - 16, height: 18)
             gridContainer.isHidden = false
             statusIconView.isHidden = true
             appIconView.isHidden = true
@@ -666,10 +712,12 @@ class ToolWindow {
                 message: "\(app.displayName) has been reinstalled successfully.")
             spinner.isHidden = true
             spinner.stopAnimation(nil)
-            primaryButton.title = "OK"
+            // Left button: Open the app. Right button: Quit.
+            secondaryButton.title = "Quit"
+            secondaryButton.isHidden = false
+            primaryButton.title = "Open \(app.displayName)"
             primaryButton.isHidden = false
             primaryButton.isEnabled = true
-            secondaryButton.isHidden = true
 
         case .error(let message):
             resizeWindow(height: ToolWindow.statusH)
@@ -781,12 +829,24 @@ guard triggerReinstall(policyID: selectedApp.jamfPolicyID) else {
     exit(1)
 }
 
+toolWindow.updateWorkingMessage("Waiting for \(selectedApp.displayName) to install...")
+
+guard waitForInstall(bundleName: selectedApp.bundleName) else {
+    let _ = toolWindow.show(state: .error("\(selectedApp.displayName) did not reinstall within the expected time. Contact IT."))
+    exit(1)
+}
+
 if let dock = dockInfo {
     toolWindow.updateWorkingMessage("Restoring dock position...")
     restoreDockPosition(app: selectedApp, section: dock.section, position: dock.position, username: user.username, uid: user.uid)
 }
 
-// Step 5: Success
+// Step 5: Success — user can quit or launch the app
 log("Delete & Reinstall complete for \(selectedApp.displayName)")
-let _ = toolWindow.show(state: .success(selectedApp))
+let successResponse = toolWindow.show(state: .success(selectedApp))
+
+if successResponse == .alertFirstButtonReturn {
+    // "Open [App]" was clicked
+    launchApp(bundleName: selectedApp.bundleName, username: user.username, uid: user.uid)
+}
 exit(0)
