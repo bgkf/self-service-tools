@@ -78,12 +78,12 @@ To add or remove apps, edit `apps.json` — no recompile required.
 
 
 **Screen Shots**<br>
-![image](https://github.com/bgkf/self-service-tools/blob/4f51b47d7420070a115337b2bb548dcd8d8c198e/Delete-and-Reinstall/swift_version/assets/Screenshot_01.png)
+![image](https://github.com/bgkf/self-service-tools/blob/edeee594c20e582ad1a84cb2c80de0f7ec9be1ac/Delete-and-Reinstall/swift_version/assets/Screenshot_01.png)
 <br>
-![image](https://github.com/bgkf/self-service-tools/blob/4f51b47d7420070a115337b2bb548dcd8d8c198e/Delete-and-Reinstall/swift_version/assets/Screenshot_02.png)
+![image](https://github.com/bgkf/self-service-tools/blob/edeee594c20e582ad1a84cb2c80de0f7ec9be1ac/Delete-and-Reinstall/swift_version/assets/Screenshot_02.png)
 <br>
-![image](https://github.com/bgkf/self-service-tools/blob/4f51b47d7420070a115337b2bb548dcd8d8c198e/Delete-and-Reinstall/swift_version/assets/Screenshot_03.png)
+![image](https://github.com/bgkf/self-service-tools/blob/edeee594c20e582ad1a84cb2c80de0f7ec9be1ac/Delete-and-Reinstall/swift_version/assets/Screenshot_03.png)
 <br>
-![image](https://github.com/bgkf/self-service-tools/blob/4f51b47d7420070a115337b2bb548dcd8d8c198e/Delete-and-Reinstall/swift_version/assets/Screenshot_04.png)
+![image](https://github.com/bgkf/self-service-tools/blob/edeee594c20e582ad1a84cb2c80de0f7ec9be1ac/Delete-and-Reinstall/swift_version/assets/Screenshot_04.png)
 <br>
-![image](https://github.com/bgkf/self-service-tools/blob/4f51b47d7420070a115337b2bb548dcd8d8c198e/Delete-and-Reinstall/swift_version/assets/Screenshot_05.png)
+![image](https://github.com/bgkf/self-service-tools/blob/edeee594c20e582ad1a84cb2c80de0f7ec9be1ac/Delete-and-Reinstall/swift_version/assets/Screenshot_05.png)
