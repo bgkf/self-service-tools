@@ -2,6 +2,8 @@
 
 A native Swift macOS app that replaces the legacy bash + IBM Notifier script for downloading a single Script or Extension Attribute from Jamf Dev directly to `/Users/Shared/`.
 
+I test in a development instance of Jamf Pro and us this tool to download files in the [git4jamfpro](https://github.com/bgkf/git4jamfpro) format.
+
 ## Installed File Structure
 
 ```
