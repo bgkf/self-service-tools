@@ -19,3 +19,8 @@ NotionAudioEnabler/
 ```
 
 Elevation is done by calling a **privileged helper** or a **pre-staged sudoers rule** that allows the specific binary to call `dseditgroup` without a password prompt.
+
+**Screen Shots**<br>
+![image](https://github.com/bgkf/self-service-tools/blob/8db13f33b009bad6080dc17d56f29bdb383fb576/Enable-System-Audio/assets/settings.png)
+<br>
+![image](https://github.com/bgkf/self-service-tools/blob/8db13f33b009bad6080dc17d56f29bdb383fb576/Enable-System-Audio/assets/tool.png)
