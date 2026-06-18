@@ -7,9 +7,10 @@ import Foundation
 
 // MARK: - Constants
 
-let kBinary     = "/usr/local/bin/splitpdf"
-let kMaxMB      = 10.0
-let kMaxNameLen = 10
+let kBinary       = "/usr/local/bin/splitpdf"
+let kMaxMBOptions = [100.0, 10.0]
+var selectedMaxMB = 100.0
+let kMaxNameLen   = 10
 
 // MARK: - Logging
 
@@ -276,6 +277,9 @@ class SplitPDFController: NSObject, NSTextFieldDelegate {
     var exampleLabel: NSTextField!
     var closeButton: NSButton!
     var revealButton: NSButton!
+    var sizeSegment: NSSegmentedControl!
+    var criteriaNote: NSTextField!
+    var nameLabel: NSTextField!
 
     var droppedURL: URL?
     var outputDirURL: URL?
@@ -316,7 +320,6 @@ class SplitPDFController: NSObject, NSTextFieldDelegate {
         // ── BUTTONS ROW ───────────────────────────────────────────────────
         let btnW = (rightW - 12) / 2
 
-        // Close / Reveal (shown after success)
         closeButton = NSButton(frame: NSRect(x: rightX, y: y, width: btnW, height: 28))
         closeButton.title      = "Close"
         closeButton.bezelStyle = .rounded
@@ -333,7 +336,6 @@ class SplitPDFController: NSObject, NSTextFieldDelegate {
         revealButton.isHidden   = true
         fx.addSubview(revealButton)
 
-        // Cancel / Split (shown initially)
         cancelButton = NSButton(frame: NSRect(x: rightX, y: y, width: btnW, height: 28))
         cancelButton.title      = "Cancel"
         cancelButton.bezelStyle = .rounded
@@ -350,18 +352,19 @@ class SplitPDFController: NSObject, NSTextFieldDelegate {
         splitButton.isEnabled     = false
         fx.addSubview(splitButton)
 
-        y += 40
+        y += 36
 
-        // ── STATUS LABEL ──────────────────────────────────────────────────
+        // ── STATUS LABEL (in gap above buttons) ──────────────────────────
         statusLabel = NSTextField(labelWithString: "")
-        statusLabel.frame         = NSRect(x: rightX, y: y, width: rightW, height: 36)
-        statusLabel.font          = .systemFont(ofSize: 13)
-        statusLabel.textColor     = .secondaryLabelColor
-        statusLabel.lineBreakMode = .byWordWrapping
-        statusLabel.isHidden      = true
+        statusLabel.frame                = NSRect(x: rightX, y: y, width: rightW, height: 34)
+        statusLabel.font                 = .systemFont(ofSize: 11)
+        statusLabel.textColor            = .secondaryLabelColor
+        statusLabel.lineBreakMode        = .byWordWrapping
+        statusLabel.maximumNumberOfLines = 0
+        statusLabel.isHidden             = true
         fx.addSubview(statusLabel)
 
-        y += 44
+        y += 40
 
         // ── VALIDATION ROWS ───────────────────────────────────────────────
         lengthRow = ValidationRow(labelText: "Max \(kMaxNameLen) characters")
@@ -399,7 +402,7 @@ class SplitPDFController: NSObject, NSTextFieldDelegate {
         y += 30
 
         // ── OUTPUT NAME LABEL ─────────────────────────────────────────────
-        let nameLabel = NSTextField(labelWithString: "Enter a name for the split PDFs")
+        nameLabel = NSTextField(labelWithString: "Enter a name for the split PDFs")
         nameLabel.frame     = NSRect(x: rightX, y: y, width: rightW, height: 18)
         nameLabel.font      = .systemFont(ofSize: 13, weight: .semibold)
         nameLabel.textColor = .labelColor
@@ -407,12 +410,13 @@ class SplitPDFController: NSObject, NSTextFieldDelegate {
         y += 28
 
         // ── CRITERIA NOTE ─────────────────────────────────────────────────
-        let note = NSTextField(labelWithString:
-            "Alphanumeric only · max \(kMaxNameLen) chars · \(Int(kMaxMB)) MB chunks")
-        note.frame         = NSRect(x: rightX, y: y, width: rightW, height: 16)
-        note.font          = .systemFont(ofSize: 11)
-        note.textColor     = .tertiaryLabelColor
-        fx.addSubview(note)
+        criteriaNote = NSTextField(labelWithString:
+            "Alphanumeric only · max \(kMaxNameLen) chars · \(Int(selectedMaxMB)) MB chunks")
+        criteriaNote.frame         = NSRect(x: rightX, y: y, width: rightW, height: 16)
+        criteriaNote.font          = .systemFont(ofSize: 11)
+        criteriaNote.textColor     = .tertiaryLabelColor
+        fx.addSubview(criteriaNote)
+        y += 22
 
         // ── DROP ZONE ─────────────────────────────────────────────────────
         let dropH = panelH - (pad * 2)
@@ -423,13 +427,25 @@ class SplitPDFController: NSObject, NSTextFieldDelegate {
         }
         fx.addSubview(dropZone)
 
-        // ── INFO BUTTON (top-right corner) ───────────────────────────────
+        // ── TOP ROW: SIZE SELECTOR + INFO BUTTON ─────────────────────────
         let infoButton = NSButton(frame: NSRect(x: panelW - 32, y: panelH - 32, width: 24, height: 24))
         infoButton.bezelStyle  = .helpButton
         infoButton.title       = ""
         infoButton.target      = self
         infoButton.action      = #selector(didShowInfo(_:))
         fx.addSubview(infoButton)
+
+        let segEach: CGFloat = 130
+        sizeSegment = NSSegmentedControl(labels: ["100 MB", "10 MB (Receipts)"],
+                                         trackingMode: .selectOne,
+                                         target: self,
+                                         action: #selector(didChangeSize(_:)))
+        sizeSegment.selectedSegment = 0
+        sizeSegment.segmentStyle = .rounded
+        sizeSegment.setWidth(segEach, forSegment: 0)
+        sizeSegment.setWidth(segEach, forSegment: 1)
+        sizeSegment.frame = NSRect(x: rightX, y: panelH - 33, width: segEach * 2, height: 24)
+        fx.addSubview(sizeSegment)
 
         panel.makeKeyAndOrderFront(nil)
         log("UI panel displayed")
@@ -464,7 +480,7 @@ class SplitPDFController: NSObject, NSTextFieldDelegate {
             "Entered name: max 10 characters",
             "A 2-digit number is appended automatically",
             "  e.g. testing → testing01.pdf",
-            "Each split PDF is under \(Int(kMaxMB)) MB",
+            "Each split PDF is under \(Int(selectedMaxMB)) MB",
         ]
 
         var ry: CGFloat = 248
@@ -599,6 +615,12 @@ class SplitPDFController: NSObject, NSTextFieldDelegate {
 
     // MARK: - Actions
 
+    @objc func didChangeSize(_ sender: NSSegmentedControl) {
+        selectedMaxMB = kMaxMBOptions[sender.selectedSegment]
+        criteriaNote.stringValue = "Alphanumeric only · max \(kMaxNameLen) chars · \(Int(selectedMaxMB)) MB chunks"
+        log("Size changed to \(Int(selectedMaxMB)) MB")
+    }
+
     @objc func didCancel() {
         log("User cancelled")
         NSApp.terminate(nil)
@@ -621,7 +643,7 @@ class SplitPDFController: NSObject, NSTextFieldDelegate {
         guard let url = droppedURL else { return }
         let name = nameField.stringValue
 
-        log("Starting split — file: \(url.path) name: \(name) maxMB: \(kMaxMB)")
+        log("Starting split — file: \(url.path) name: \(name) maxMB: \(selectedMaxMB)")
 
         splitButton.isEnabled  = false
         cancelButton.isEnabled = false
@@ -650,7 +672,7 @@ class SplitPDFController: NSObject, NSTextFieldDelegate {
 
             let process = Process()
             process.executableURL = URL(fileURLWithPath: kBinary)
-            process.arguments     = [renamedPDF.path, String(kMaxMB)]
+            process.arguments     = [renamedPDF.path, String(selectedMaxMB)]
 
             let outPipe = Pipe()
             let errPipe = Pipe()
@@ -697,10 +719,21 @@ class SplitPDFController: NSObject, NSTextFieldDelegate {
 
             let files = (try? fm.contentsOfDirectory(atPath: finalOutputDir.path)) ?? []
             let count = files.filter { $0.hasSuffix(".pdf") }.count
-            log("Split complete — \(count) file(s) written to \(finalOutputDir.path)")
+            let hasOversized = outStr.contains("OVERSIZED_SUMMARY:") || outStr.contains("OVERSIZED_PAGE:")
+            log("Split complete — \(count) file(s) written to \(finalOutputDir.path), oversized: \(hasOversized)")
+
+            if count == 0 {
+                try? fm.removeItem(at: finalOutputDir)
+            }
 
             DispatchQueue.main.async {
-                self.showSuccess("\(count) file\(count == 1 ? "" : "s") written to \(name)/")
+                if count == 0 {
+                    self.showWarning("This single-page PDF exceeds \(Int(selectedMaxMB)) MB and can't be split further. You could take a screenshot of it instead.")
+                } else if hasOversized {
+                    self.showSuccess("\(count) file\(count == 1 ? "" : "s") written to \(name)/\n⚠ Some pages were skipped (over \(Int(selectedMaxMB)) MB). Try screenshots for those.")
+                } else {
+                    self.showSuccess("\(count) file\(count == 1 ? "" : "s") written to \(name)/")
+                }
             }
         }
     }
@@ -715,6 +748,17 @@ class SplitPDFController: NSObject, NSTextFieldDelegate {
         cancelButton.isHidden   = true
         closeButton.isHidden    = false
         revealButton.isHidden   = false
+    }
+
+    func showWarning(_ message: String) {
+        log("Warning: \(message)")
+        statusLabel.stringValue = "⚠  " + message
+        statusLabel.textColor   = .systemOrange
+        statusLabel.isHidden    = false
+        splitButton.isHidden    = true
+        cancelButton.isHidden   = true
+        closeButton.isHidden    = false
+        revealButton.isHidden   = true
     }
 
     func showError(_ message: String) {
