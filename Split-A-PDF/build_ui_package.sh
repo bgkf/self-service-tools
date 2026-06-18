@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-VERSION="1.0.0"
+VERSION="2.1.0"
 IDENTIFIER="com.yourorg.splitpdf.ui"
 PKG_NAME="SplitPDFUI-${VERSION}.pkg"
 PAYLOAD_ROOT="$(mktemp -d)"
