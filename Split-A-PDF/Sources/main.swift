@@ -152,8 +152,9 @@ func writeChunk(_ chunk: PDFDocument, index: Int, baseName: String, to dir: URL)
 
 print("Splitting into chunks ≤ \(maxMB) MB...")
 
-var chunkIndex   = 1
-var currentChunk = PDFDocument()
+var chunkIndex    = 1
+var currentChunk  = PDFDocument()
+var skippedPages  = [Int]()
 
 for i in 0..<flatPDF.pageCount {
     guard let page = flatPDF.page(at: i) else { continue }
@@ -165,18 +166,10 @@ for i in 0..<flatPDF.pageCount {
        probeData.count > safeBytes {
 
         if currentChunk.pageCount == 1 {
-            // Single page exceeds the limit — write it as an oversized chunk
-            // and warn. Splitting a single page further would require
-            // rasterization which we intentionally avoid.
-            print("  Warning: page \(i + 1) alone exceeds \(maxMB) MB — writing as oversized chunk.")
-            do {
-                try writeChunk(currentChunk, index: chunkIndex, baseName: safeName, to: outputDir)
-            } catch {
-                fputs("Error writing chunk: \(error.localizedDescription)\n", stderr)
-                exit(1)
-            }
-            chunkIndex   += 1
-            currentChunk  = PDFDocument()
+            let pageMB = String(format: "%.1f", Double(probeData.count) / 1024.0 / 1024.0)
+            print("OVERSIZED_PAGE:\(i + 1):\(pageMB)")
+            skippedPages.append(i + 1)
+            currentChunk = PDFDocument()
         } else {
             // Back off: remove the page that pushed us over the limit
             currentChunk.removePage(at: currentChunk.pageCount - 1)
@@ -207,4 +200,8 @@ if currentChunk.pageCount > 0 {
     }
 }
 
-print("Done. \(chunkIndex) file(s) written to \(outputDir.lastPathComponent)/")
+let writtenCount = chunkIndex - 1
+if !skippedPages.isEmpty {
+    print("OVERSIZED_SUMMARY:\(skippedPages.map { String($0) }.joined(separator: ","))")
+}
+print("Done. \(writtenCount) file(s) written to \(outputDir.lastPathComponent)/")
